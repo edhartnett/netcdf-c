@@ -168,15 +168,189 @@ static void close_library(void* handle);
    
    Note: If `NETCDF.DISPATCH.PATH` is specified, it can be used to search for libraries when relative paths are given. If not specified or if absolute paths are used in `NETCDF.UDF0.LIBRARY`, the path is used directly.
 
-3. **Platform-specific dynamic loading:**
-   - Use `dlopen()`/`dlsym()`/`dlclose()` on Unix/Linux
-   - Use `LoadLibrary()`/`GetProcAddress()`/`FreeLibrary()` on Windows
-   - Use existing netCDF-C platform abstraction if available
+3. **Library path resolution:**
+   
+   The `load_udf_plugin()` function resolves library paths as follows:
+   
+   a. **Absolute paths** - Use directly:
+      ```c
+      if (is_absolute_path(library_path)) {
+          full_path = strdup(library_path);
+      }
+      ```
+   
+   b. **Relative paths with NETCDF.DISPATCH.PATH** - Search each directory:
+      ```c
+      else if (dispatch_path != NULL) {
+          // Parse dispatch_path (colon/semicolon separated)
+          // Try library_path in each directory
+          for each dir in dispatch_path:
+              full_path = join_path(dir, library_path);
+              if (file_exists(full_path)) break;
+      }
+      ```
+   
+   c. **Relative paths without NETCDF.DISPATCH.PATH** - Use system search:
+      ```c
+      else {
+          // Let dlopen/LoadLibrary use system search paths
+          full_path = strdup(library_path);
+      }
+      ```
 
-4. **Error handling:**
-   - Log warnings for plugin load failures
-   - Don't fail library initialization if plugins fail
-   - Provide clear error messages about missing symbols or libraries
+4. **Platform-specific dynamic loading:**
+   
+   Implement wrapper functions for cross-platform compatibility:
+   
+   **Unix/Linux/macOS:**
+   ```c
+   #include <dlfcn.h>
+   
+   static void* load_library(const char* path) {
+       void* handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+       if (!handle) {
+           nclog(NCLOGERR, "dlopen failed: %s", dlerror());
+       }
+       return handle;
+   }
+   
+   static void* get_symbol(void* handle, const char* symbol) {
+       void* sym = dlsym(handle, symbol);
+       if (!sym) {
+           nclog(NCLOGERR, "dlsym failed for %s: %s", symbol, dlerror());
+       }
+       return sym;
+   }
+   
+   static void close_library(void* handle) {
+       if (handle) dlclose(handle);
+   }
+   ```
+   
+   **Windows:**
+   ```c
+   #include <windows.h>
+   
+   static void* load_library(const char* path) {
+       HMODULE handle = LoadLibraryA(path);
+       if (!handle) {
+           DWORD err = GetLastError();
+           nclog(NCLOGERR, "LoadLibrary failed: error %lu", err);
+       }
+       return (void*)handle;
+   }
+   
+   static void* get_symbol(void* handle, const char* symbol) {
+       void* sym = (void*)GetProcAddress((HMODULE)handle, symbol);
+       if (!sym) {
+           DWORD err = GetLastError();
+           nclog(NCLOGERR, "GetProcAddress failed for %s: error %lu", 
+                 symbol, err);
+       }
+       return sym;
+   }
+   
+   static void close_library(void* handle) {
+       if (handle) FreeLibrary((HMODULE)handle);
+   }
+   ```
+   
+   **Flags and options:**
+   - `RTLD_NOW` - Resolve all symbols immediately (fail fast)
+   - `RTLD_LOCAL` - Keep symbols local to avoid conflicts
+   - Consider `RTLD_DEEPBIND` on Linux to prefer plugin's symbols
+
+5. **Complete load_udf_plugin() implementation:**
+   ```c
+   static int load_udf_plugin(int udf_number, const char* library_path,
+                              const char* init_func, const char* magic,
+                              const char* dispatch_path)
+   {
+       int stat = NC_NOERR;
+       void* handle = NULL;
+       char* full_path = NULL;
+       int (*init_function)(void) = NULL;
+       int mode_flag = (udf_number == 0) ? NC_UDF0 : NC_UDF1;
+       
+       // Resolve library path
+       if((stat = resolve_library_path(library_path, dispatch_path, &full_path)))
+           goto done;
+       
+       // Load the library
+       handle = load_library(full_path);
+       if (!handle) {
+           stat = NC_ENOTNC; // or new error code NC_EPLUGIN
+           goto done;
+       }
+       
+       // Get the initialization function
+       init_function = (int (*)(void))get_symbol(handle, init_func);
+       if (!init_function) {
+           stat = NC_ENOTNC;
+           goto done;
+       }
+       
+       // Call the initialization function
+       // This should call nc_def_user_format() internally
+       if((stat = init_function())) {
+           nclog(NCLOGERR, "Plugin init function %s failed: %d", 
+                 init_func, stat);
+           goto done;
+       }
+       
+       // Verify the dispatch table was registered
+       NC_Dispatch* dispatch_table = NULL;
+       char magic_check[NC_MAX_MAGIC_NUMBER_LEN + 1];
+       if((stat = nc_inq_user_format(mode_flag, &dispatch_table, magic_check))) {
+           nclog(NCLOGERR, "Plugin did not register dispatch table");
+           goto done;
+       }
+       
+       if (dispatch_table == NULL) {
+           nclog(NCLOGERR, "Plugin registered NULL dispatch table");
+           stat = NC_EINVAL;
+           goto done;
+       }
+       
+       // Optionally verify magic number matches
+       if (magic != NULL && strlen(magic_check) > 0) {
+           if (strcmp(magic, magic_check) != 0) {
+               nclog(NCLOGWARN, "Plugin magic number mismatch: "
+                     "expected %s, got %s", magic, magic_check);
+           }
+       }
+       
+       nclog(NCLOGNOTE, "Successfully loaded UDF%d plugin from %s", 
+             udf_number, full_path);
+       
+   done:
+       // Note: We don't close the library handle - it stays loaded
+       // The dispatch table and its functions must remain accessible
+       nullfree(full_path);
+       return stat;
+   }
+   ```
+
+6. **Error handling and validation:**
+   - **Path validation:**
+     - Check library file exists and is readable
+     - Validate file permissions (not world-writable)
+     - Reject paths with suspicious patterns (e.g., `..`)
+   
+   - **Symbol validation:**
+     - Verify dispatch table version matches `NC_DISPATCH_VERSION`
+     - Check critical function pointers are non-NULL
+     - Validate magic number format (printable ASCII, reasonable length)
+   
+   - **Graceful degradation:**
+     - Log detailed error messages with file paths and error codes
+     - Continue initialization even if plugins fail to load
+     - Provide `nc_inq_user_format()` to check if UDF is available
+   
+   - **Security considerations:**
+     - Consider adding `NETCDF.PLUGIN.VERIFY` RC key to require code signatures
+     - Document security implications in user guide
+     - Recommend absolute paths in production environments
 
 **Effort:** ~2-3 days  
 **Risk:** Medium - requires careful dynamic loading and error handling
