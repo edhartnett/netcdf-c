@@ -363,17 +363,267 @@ static void close_library(void* handle);
 - Create `docs/udf_plugins.md` - Comprehensive UDF plugin guide
 - Update `INSTALL.md` - Mention RC-based plugin configuration
 
-**Test cases:**
-- Unit test: RC file parsing for plugin keys
-- Integration test: Load a test UDF plugin via RC file
-- Error handling test: Invalid library paths, missing symbols
-- Multi-platform test: Verify on Linux, macOS, Windows
+**Unit Tests:**
 
-**Example plugin for testing:**
-Create a simple test plugin in `plugins/test_udf/` that:
-- Implements a minimal dispatch table
-- Provides an initialization function
-- Can be loaded via RC file
+Create comprehensive test suite in `unit_test/test_udf_plugins.c`:
+
+1. **Test Plugin Library Creation** (`plugins/test_udf/`)
+   
+   Create two minimal test plugins for testing:
+   
+   **test_udf0_plugin.c:**
+   ```c
+   #include <netcdf.h>
+   #include <netcdf_dispatch.h>
+   
+   // Minimal dispatch table for testing
+   static NC_Dispatch test_udf0_dispatcher = {
+       NC_FORMATX_UDF0,
+       NC_DISPATCH_VERSION,
+       // Minimal function pointers (can be stubs for testing)
+       .create = test_udf0_create,
+       .open = test_udf0_open,
+       // ... other required functions ...
+   };
+   
+   // Initialization function
+   int test_udf0_init(void) {
+       return nc_def_user_format(NC_UDF0, &test_udf0_dispatcher, "TESTUDF0");
+   }
+   ```
+   
+   **test_udf1_plugin.c:**
+   - Similar to UDF0 but for UDF1 slot
+   - Different magic number "TESTUDF1"
+   - Different initialization function name
+
+2. **RC File Parsing Tests** (`test_rc_plugin_keys`)
+   
+   Test that RC file keys are correctly read:
+   ```c
+   void test_rc_plugin_keys(void) {
+       // Create temporary .ncrc file
+       FILE* rc = fopen(".ncrc", "w");
+       fprintf(rc, "NETCDF.UDF0.LIBRARY=/path/to/test.so\n");
+       fprintf(rc, "NETCDF.UDF0.INIT=test_init\n");
+       fprintf(rc, "NETCDF.UDF0.MAGIC=TESTMAGIC\n");
+       fprintf(rc, "NETCDF.DISPATCH.PATH=/usr/local/lib:/opt/lib\n");
+       fclose(rc);
+       
+       // Reinitialize RC system
+       ncrc_initialize();
+       
+       // Verify values can be retrieved
+       char* lib = NC_rclookup("NETCDF.UDF0.LIBRARY", NULL, NULL);
+       assert(lib != NULL);
+       assert(strcmp(lib, "/path/to/test.so") == 0);
+       
+       char* init = NC_rclookup("NETCDF.UDF0.INIT", NULL, NULL);
+       assert(strcmp(init, "test_init") == 0);
+       
+       char* magic = NC_rclookup("NETCDF.UDF0.MAGIC", NULL, NULL);
+       assert(strcmp(magic, "TESTMAGIC") == 0);
+       
+       char* path = NC_rclookup("NETCDF.DISPATCH.PATH", NULL, NULL);
+       assert(strcmp(path, "/usr/local/lib:/opt/lib") == 0);
+       
+       // Cleanup
+       unlink(".ncrc");
+   }
+   ```
+
+3. **Plugin Loading Success Tests** (`test_load_plugin_success`)
+   
+   Test successful plugin loading:
+   ```c
+   void test_load_plugin_success(void) {
+       // Setup RC file with test plugin
+       FILE* rc = fopen(".ncrc", "w");
+       fprintf(rc, "NETCDF.UDF0.LIBRARY=%s\n", TEST_PLUGIN_PATH);
+       fprintf(rc, "NETCDF.UDF0.INIT=test_udf0_init\n");
+       fclose(rc);
+       
+       // Initialize library (should load plugin)
+       int stat = nc_initialize();
+       assert(stat == NC_NOERR);
+       
+       // Verify dispatch table was registered
+       NC_Dispatch* dispatch = NULL;
+       char magic[NC_MAX_MAGIC_NUMBER_LEN + 1];
+       stat = nc_inq_user_format(NC_UDF0, &dispatch, magic);
+       assert(stat == NC_NOERR);
+       assert(dispatch != NULL);
+       assert(strcmp(magic, "TESTUDF0") == 0);
+       
+       // Cleanup
+       unlink(".ncrc");
+   }
+   ```
+
+4. **Path Resolution Tests** (`test_path_resolution`)
+   
+   Test library path resolution logic:
+   ```c
+   void test_path_resolution(void) {
+       // Test absolute path
+       char* result = NULL;
+       resolve_library_path("/absolute/path/lib.so", NULL, &result);
+       assert(strcmp(result, "/absolute/path/lib.so") == 0);
+       free(result);
+       
+       // Test relative path with dispatch path
+       resolve_library_path("lib.so", "/dir1:/dir2", &result);
+       // Should search /dir1/lib.so, /dir2/lib.so
+       
+       // Test relative path without dispatch path
+       resolve_library_path("lib.so", NULL, &result);
+       assert(strcmp(result, "lib.so") == 0); // Pass through
+       free(result);
+   }
+   ```
+
+5. **Error Handling Tests** (`test_plugin_errors`)
+   
+   Test various error conditions:
+   ```c
+   void test_plugin_errors(void) {
+       int stat;
+       
+       // Test: Library file doesn't exist
+       FILE* rc = fopen(".ncrc", "w");
+       fprintf(rc, "NETCDF.UDF0.LIBRARY=/nonexistent/path/lib.so\n");
+       fprintf(rc, "NETCDF.UDF0.INIT=init_func\n");
+       fclose(rc);
+       
+       stat = nc_initialize();
+       // Should succeed but log warning, not fail initialization
+       assert(stat == NC_NOERR);
+       
+       // Verify UDF0 was NOT registered
+       NC_Dispatch* dispatch = NULL;
+       stat = nc_inq_user_format(NC_UDF0, &dispatch, NULL);
+       assert(dispatch == NULL);
+       
+       unlink(".ncrc");
+       
+       // Test: Init function doesn't exist in library
+       // Test: Init function returns error
+       // Test: Init function doesn't call nc_def_user_format()
+       // Test: Invalid magic number format
+       // ... additional error cases ...
+   }
+   ```
+
+6. **Multiple Plugin Tests** (`test_multiple_plugins`)
+   
+   Test loading both UDF0 and UDF1:
+   ```c
+   void test_multiple_plugins(void) {
+       FILE* rc = fopen(".ncrc", "w");
+       fprintf(rc, "NETCDF.UDF0.LIBRARY=%s\n", TEST_UDF0_PATH);
+       fprintf(rc, "NETCDF.UDF0.INIT=test_udf0_init\n");
+       fprintf(rc, "NETCDF.UDF1.LIBRARY=%s\n", TEST_UDF1_PATH);
+       fprintf(rc, "NETCDF.UDF1.INIT=test_udf1_init\n");
+       fclose(rc);
+       
+       int stat = nc_initialize();
+       assert(stat == NC_NOERR);
+       
+       // Verify both are registered
+       NC_Dispatch* dispatch0 = NULL;
+       NC_Dispatch* dispatch1 = NULL;
+       nc_inq_user_format(NC_UDF0, &dispatch0, NULL);
+       nc_inq_user_format(NC_UDF1, &dispatch1, NULL);
+       
+       assert(dispatch0 != NULL);
+       assert(dispatch1 != NULL);
+       assert(dispatch0 != dispatch1); // Different tables
+       
+       unlink(".ncrc");
+   }
+   ```
+
+7. **Re-registration Tests** (`test_plugin_reregistration`)
+   
+   Test that re-registering overwrites previous plugin:
+   ```c
+   void test_plugin_reregistration(void) {
+       // Register first plugin programmatically
+       nc_def_user_format(NC_UDF0, &first_dispatcher, "FIRST");
+       
+       // Load second plugin via RC file
+       FILE* rc = fopen(".ncrc", "w");
+       fprintf(rc, "NETCDF.UDF0.LIBRARY=%s\n", SECOND_PLUGIN_PATH);
+       fprintf(rc, "NETCDF.UDF0.INIT=second_init\n");
+       fclose(rc);
+       
+       nc_initialize();
+       
+       // Verify second plugin replaced first
+       NC_Dispatch* dispatch = NULL;
+       char magic[NC_MAX_MAGIC_NUMBER_LEN + 1];
+       nc_inq_user_format(NC_UDF0, &dispatch, magic);
+       
+       assert(dispatch == &second_dispatcher);
+       assert(strcmp(magic, "SECOND") == 0);
+       
+       unlink(".ncrc");
+   }
+   ```
+
+8. **Platform-Specific Tests** (`test_dynamic_loading`)
+   
+   Test platform-specific dynamic loading:
+   ```c
+   void test_dynamic_loading(void) {
+       void* handle = NULL;
+       void* symbol = NULL;
+       
+       // Load test plugin library
+       handle = load_library(TEST_PLUGIN_PATH);
+       assert(handle != NULL);
+       
+       // Get known symbol
+       symbol = get_symbol(handle, "test_udf0_init");
+       assert(symbol != NULL);
+       
+       // Try to get non-existent symbol
+       symbol = get_symbol(handle, "nonexistent_function");
+       assert(symbol == NULL);
+       
+       // Note: Don't close handle (matches production behavior)
+   }
+   ```
+
+9. **Security Tests** (`test_plugin_security`)
+   
+   Test security validations:
+   ```c
+   void test_plugin_security(void) {
+       // Test: Reject world-writable libraries
+       // Test: Reject paths with ../
+       // Test: Reject symlinks to unsafe locations
+       // Test: Validate dispatch table version
+       // Test: Validate function pointers non-NULL
+   }
+   ```
+
+**Integration Tests:**
+
+Create `nc_test4/tst_udf_plugin.c` for end-to-end testing:
+
+1. **File Creation Test** - Create a file using UDF plugin
+2. **File Reading Test** - Read a file created by UDF plugin
+3. **Format Detection Test** - Verify magic number detection works
+4. **Cross-format Test** - Mix UDF and standard NetCDF formats
+
+**Test Infrastructure:**
+
+- Add CMake targets for building test plugins
+- Add test data directory with sample RC files
+- Create shell script `unit_test/run_udf_plugin_tests.sh` for test orchestration
+- Ensure tests clean up temporary files and RC files
+- Add tests to CI/CD pipeline (`.github/workflows/`)
 
 **Effort:** ~2 days  
 **Risk:** Low
