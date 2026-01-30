@@ -110,14 +110,14 @@ jobs:
         run: |
           cd build
           lcov --capture --directory . --output-file coverage.info
-          lcov --remove coverage.info '/usr/*' '*/test/*' '*/tests/*' --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '*/test/*' '*/tests/*' '*/build/*' '*/.y' '*/dce.y' '*/lex.*.c' --output-file coverage.info
           lcov --list coverage.info | tee coverage_summary.txt
 
       - name: Generate HTML Coverage Report
         shell: bash -l {0}
         run: |
           cd build
-          genhtml coverage.info --output-directory coverage_html
+          genhtml coverage.info --output-directory coverage_html --ignore-errors source
           
       - name: Create Coverage Summary
         shell: bash -l {0}
