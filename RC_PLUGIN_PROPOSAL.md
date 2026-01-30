@@ -39,7 +39,7 @@ RC files are searched in this order:
 
 ## Proposal: RC-Based Plugin Registration
 
-### Option B: Initialization Function Registration
+### Initialization Function Registration
 
 Allow users to specify plugin initialization functions in RC files. The library will dynamically load the plugin library and call the initialization function during library startup.
 
@@ -56,8 +56,8 @@ NETCDF.UDF1.INIT=another_format_init
 # Optional: specify magic number via RC
 NETCDF.UDF0.MAGIC=MYFORMAT
 
-# Filter plugin path (also supported)
-NETCDF.PLUGIN.PATH=/usr/local/lib/netcdf/plugins:/opt/custom/plugins
+# Dispatch table plugin search path (separate from filter plugins)
+NETCDF.DISPATCH.PATH=/usr/local/lib/netcdf/dispatch:/opt/custom/dispatch
 ```
 
 ### Initialization Function Signature
@@ -93,41 +93,19 @@ int my_format_init(void) {
 
 ## Implementation Plan
 
-### Phase 1: Filter Plugin Path Support (Simple)
+### Important: Separate Plugin Path Systems
 
-**Files to modify:**
-- `libdispatch/dplugins.c` - Modify `buildinitialpluginpath()`
+**Filter Plugins** (HDF5/Zarr compression filters):
+- Use `HDF5_PLUGIN_PATH` environment variable
+- Managed by existing `libdispatch/dplugins.c` code
+- **Not modified by this proposal**
 
-**Changes:**
-```c
-static int buildinitialpluginpath(NCPluginList* dirs)
-{
-    int stat = NC_NOERR;
-    const char* pluginpath = NULL;
-    
-    /* Priority order:
-       1. HDF5_PLUGIN_PATH environment variable (highest)
-       2. NETCDF.PLUGIN.PATH from RC file
-       3. NETCDF_PLUGIN_SEARCH_PATH build constant (fallback)
-    */
-    pluginpath = getenv(PLUGIN_ENV);
-    if(pluginpath == NULL) {
-        pluginpath = NC_rclookup("NETCDF.PLUGIN.PATH", NULL, NULL);
-    }
-    if(pluginpath == NULL) {
-        pluginpath = NETCDF_PLUGIN_SEARCH_PATH;
-    }
-    if((stat = ncaux_plugin_path_parse(pluginpath,'\0',dirs))) goto done;
+**Dispatch Table Plugins** (User-defined formats):
+- Use `NETCDF.DISPATCH.PATH` RC file key
+- New implementation for UDF plugin loading
+- **Completely separate from filter plugin paths**
 
-done:
-    return stat;
-}
-```
-
-**Effort:** ~1 hour  
-**Risk:** Low - simple extension of existing code
-
-### Phase 2: UDF Plugin Loading (Complex)
+### Phase 1: UDF Plugin Loading
 
 **New files to create:**
 - `libdispatch/dudfplugins.c` - UDF plugin loading implementation
@@ -161,13 +139,17 @@ static void close_library(void* handle);
    ```c
    int NC_udf_load_plugins(void) {
        int stat = NC_NOERR;
+       const char* dispatch_path = NULL;
+       
+       // Get optional dispatch plugin search path (separate from filter plugins)
+       dispatch_path = NC_rclookup("NETCDF.DISPATCH.PATH", NULL, NULL);
        
        // Try UDF0
        const char* lib0 = NC_rclookup("NETCDF.UDF0.LIBRARY", NULL, NULL);
        const char* init0 = NC_rclookup("NETCDF.UDF0.INIT", NULL, NULL);
        const char* magic0 = NC_rclookup("NETCDF.UDF0.MAGIC", NULL, NULL);
        if(lib0 && init0) {
-           if((stat = load_udf_plugin(0, lib0, init0, magic0))) 
+           if((stat = load_udf_plugin(0, lib0, init0, magic0, dispatch_path))) 
                nclog(NCLOGWARN, "Failed to load UDF0 plugin: %s", lib0);
        }
        
@@ -176,13 +158,15 @@ static void close_library(void* handle);
        const char* init1 = NC_rclookup("NETCDF.UDF1.INIT", NULL, NULL);
        const char* magic1 = NC_rclookup("NETCDF.UDF1.MAGIC", NULL, NULL);
        if(lib1 && init1) {
-           if((stat = load_udf_plugin(1, lib1, init1, magic1)))
+           if((stat = load_udf_plugin(1, lib1, init1, magic1, dispatch_path)))
                nclog(NCLOGWARN, "Failed to load UDF1 plugin: %s", lib1);
        }
        
        return NC_NOERR; // Don't fail initialization if plugins fail
    }
    ```
+   
+   Note: If `NETCDF.DISPATCH.PATH` is specified, it can be used to search for libraries when relative paths are given. If not specified or if absolute paths are used in `NETCDF.UDF0.LIBRARY`, the path is used directly.
 
 3. **Platform-specific dynamic loading:**
    - Use `dlopen()`/`dlsym()`/`dlclose()` on Unix/Linux
@@ -197,7 +181,7 @@ static void close_library(void* handle);
 **Effort:** ~2-3 days  
 **Risk:** Medium - requires careful dynamic loading and error handling
 
-### Phase 3: Documentation and Testing
+### Phase 2: Documentation and Testing
 
 **Documentation updates:**
 - `docs/filters.md` - Add section on UDF plugin configuration
@@ -257,35 +241,24 @@ Create a simple test plugin in `plugins/test_udf/` that:
 4. **Development** - Easier testing of new format implementations
 5. **Deployment** - Simplified plugin distribution and installation
 
-## Alternatives Considered
-
-### Option A: Direct Library Path in RC
-
-```ini
-NETCDF.UDF0.LIBRARY=/path/to/myformat.so
-```
-
-Library would need to export a known symbol name (e.g., `netcdf_udf0_dispatch_table`).
-
-**Rejected because:**
-- Less flexible (fixed symbol names)
-- Harder for plugin developers
-- No initialization hook for complex setup
-
 ## Timeline
 
-- **Phase 1 (Filter paths):** 1 day
-- **Phase 2 (UDF loading):** 3 days
-- **Phase 3 (Documentation/Testing):** 2 days
+- **Phase 1 (UDF loading):** 3 days
+- **Phase 2 (Documentation/Testing):** 2 days
 - **Total:** ~1 week of development time
+
+## Plugin Lifecycle
+
+- **Eager loading at initialization** - Plugins are loaded during `NC4_initialize()`, before any file operations
+- **No unload/cleanup required** - Plugin libraries remain loaded for the lifetime of the process
+- **Re-registration allowed** - If a new plugin is registered for the same UDF constant (UDF0 or UDF1), it overwrites the previous registration
+- **Library handles not cached** - The dynamic library handle is used only during initialization and not retained
+
+Note: Lazy loading is not feasible because dispatch tables must be registered before format detection can occur during file open operations.
 
 ## Open Questions
 
-1. Should we support multiple plugins per UDF slot (UDF0, UDF1)?
-2. Should we add `NETCDF.UDF2`, `NETCDF.UDF3`, etc. for more formats?
-3. Should plugin loading be lazy (on first use) or eager (at initialization)?
-4. Should we cache loaded library handles or reload each time?
-5. Do we need a plugin unload/cleanup mechanism?
+1. Should we add `NETCDF.UDF2`, `NETCDF.UDF3`, etc. for more formats?
 
 ## References
 
