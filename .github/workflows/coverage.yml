@@ -111,14 +111,42 @@ jobs:
           cd build
           lcov --capture --directory . --output-file coverage.info
           lcov --remove coverage.info '/usr/*' '*/test/*' '*/tests/*' --output-file coverage.info
-          lcov --list coverage.info
+          lcov --list coverage.info | tee coverage_summary.txt
 
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Generate HTML Coverage Report
+        shell: bash -l {0}
+        run: |
+          cd build
+          genhtml coverage.info --output-directory coverage_html
+          
+      - name: Create Coverage Summary
+        shell: bash -l {0}
+        run: |
+          cd build
+          echo "## Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          lcov --summary coverage.info 2>&1 | grep -A 3 "Summary coverage" >> $GITHUB_STEP_SUMMARY || \
+          tail -20 coverage_summary.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Full HTML report available in artifacts" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Coverage HTML Report
+        uses: actions/upload-artifact@v4
         with:
-          files: ./build/coverage.info
-          fail_ci_if_error: false
-          verbose: true
+          name: coverage-report
+          path: build/coverage_html/
+          retention-days: 30
+
+      - name: Upload Coverage Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data
+          path: |
+            build/coverage.info
+            build/coverage_summary.txt
+          retention-days: 30
 
       - name: Verbose Output if CTest Failure
         shell: bash -l {0}
