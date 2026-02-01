@@ -145,6 +145,14 @@ extern "C" {
 
 #define NC_UDF0          0x0040  /**< User-defined format 0. */
 #define NC_UDF1          0x0080  /**< User-defined format 1. */
+#define NC_UDF2          0x10000  /**< User-defined format 2. */
+#define NC_UDF3          0x20000  /**< User-defined format 3. */
+#define NC_UDF4          0x40000  /**< User-defined format 4. */
+#define NC_UDF5          0x80000  /**< User-defined format 5. */
+#define NC_UDF6          0x100000  /**< User-defined format 6. */
+#define NC_UDF7          0x200000  /**< User-defined format 7. */
+#define NC_UDF8          0x400000  /**< User-defined format 8. */
+#define NC_UDF9          0x800000  /**< User-defined format 9. */
 
 #define NC_CLASSIC_MODEL 0x0100 /**< Enforce classic model on netCDF-4. Mode flag for nc_create(). */
 #define NC_64BIT_OFFSET  0x0200  /**< Use large (64-bit) file offsets. Mode flag for nc_create(). */
@@ -176,6 +184,7 @@ Use this in mode flags for both nc_create() and nc_open(). */
 #define NC_NODIMSCALE_ATTACH 0x40000 /**< Disable the netcdf-4 (hdf5) attaching of dimscales to variables (#2128) */
 
 #define NC_MAX_MAGIC_NUMBER_LEN 8 /**< Max len of user-defined format magic number. */
+#define NC_MAX_UDF_FORMATS 10 /**< Maximum number of user-defined formats. */
 
 /** Format specifier for nc_set_default_format() and returned
  *  by nc_inq_format. This returns the format as provided by
@@ -200,7 +209,7 @@ Use this in mode flags for both nc_create() and nc_open(). */
 #define NC_FORMAT_CDF5    NC_FORMAT_64BIT_DATA
 
 /* Define a mask covering format flags only */
-#define NC_FORMAT_ALL (NC_64BIT_OFFSET|NC_64BIT_DATA|NC_CLASSIC_MODEL|NC_NETCDF4|NC_UDF0|NC_UDF1)
+#define NC_FORMAT_ALL (NC_64BIT_OFFSET|NC_64BIT_DATA|NC_CLASSIC_MODEL|NC_NETCDF4|NC_UDF0|NC_UDF1|NC_UDF2|NC_UDF3|NC_UDF4|NC_UDF5|NC_UDF6|NC_UDF7|NC_UDF8|NC_UDF9)
 
 /**@}*/
 
@@ -232,6 +241,14 @@ Use this in mode flags for both nc_create() and nc_open(). */
 #define NC_FORMATX_UDF0      (8)
 #define NC_FORMATX_UDF1      (9)
 #define NC_FORMATX_NCZARR    (10) /**< Added in version 4.8.0 */
+#define NC_FORMATX_UDF2      (11)
+#define NC_FORMATX_UDF3      (12)
+#define NC_FORMATX_UDF4      (13)
+#define NC_FORMATX_UDF5      (14)
+#define NC_FORMATX_UDF6      (15)
+#define NC_FORMATX_UDF7      (16)
+#define NC_FORMATX_UDF8      (17)
+#define NC_FORMATX_UDF9      (18)
 #define NC_FORMATX_UNDEFINED (0)
 
   /* To avoid breaking compatibility (such as in the python library),

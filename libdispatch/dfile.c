@@ -46,10 +46,32 @@
 
 
 /* User-defined formats. */
-NC_Dispatch *UDF0_dispatch_table = NULL;
-char UDF0_magic_number[NC_MAX_MAGIC_NUMBER_LEN + 1] = "";
-NC_Dispatch *UDF1_dispatch_table = NULL;
-char UDF1_magic_number[NC_MAX_MAGIC_NUMBER_LEN + 1] = "";
+NC_Dispatch *UDF_dispatch_tables[NC_MAX_UDF_FORMATS] = {NULL};
+char UDF_magic_numbers[NC_MAX_UDF_FORMATS][NC_MAX_MAGIC_NUMBER_LEN + 1] = {{0}};
+
+/* Helper function to convert NC_UDFn mode flag to array index (0-9) */
+static int udf_mode_to_index(int mode_flag) {
+    if (fIsSet(mode_flag, NC_UDF0)) return 0;
+    if (fIsSet(mode_flag, NC_UDF1)) return 1;
+    if (fIsSet(mode_flag, NC_UDF2)) return 2;
+    if (fIsSet(mode_flag, NC_UDF3)) return 3;
+    if (fIsSet(mode_flag, NC_UDF4)) return 4;
+    if (fIsSet(mode_flag, NC_UDF5)) return 5;
+    if (fIsSet(mode_flag, NC_UDF6)) return 6;
+    if (fIsSet(mode_flag, NC_UDF7)) return 7;
+    if (fIsSet(mode_flag, NC_UDF8)) return 8;
+    if (fIsSet(mode_flag, NC_UDF9)) return 9;
+    return -1;
+}
+
+/* Helper function to convert NC_FORMATX_UDFn to array index (0-9) */
+static int udf_formatx_to_index(int formatx) {
+    if (formatx >= NC_FORMATX_UDF0 && formatx <= NC_FORMATX_UDF1)
+        return formatx - NC_FORMATX_UDF0;
+    if (formatx >= NC_FORMATX_UDF2 && formatx <= NC_FORMATX_UDF9)
+        return formatx - NC_FORMATX_UDF2 + 2;
+    return -1;
+}
 
 /**************************************************/
 
@@ -122,6 +144,8 @@ char UDF1_magic_number[NC_MAX_MAGIC_NUMBER_LEN + 1] = "";
 int
 nc_def_user_format(int mode_flag, NC_Dispatch *dispatch_table, char *magic_number)
 {
+    int udf_index;
+
     /* Check inputs. */
     if (!dispatch_table)
         return NC_EINVAL;
@@ -137,24 +161,17 @@ nc_def_user_format(int mode_flag, NC_Dispatch *dispatch_table, char *magic_numbe
                         (fIsSet(mode_flag, NC_CLASSIC_MODEL) &&
                         !fIsSet(mode_flag, NC_NETCDF4))))
         return NC_EINVAL;
+
+    /* Get the UDF index from the mode flag. */
+    udf_index = udf_mode_to_index(mode_flag);
+    if (udf_index < 0 || udf_index >= NC_MAX_UDF_FORMATS)
+        return NC_EINVAL;
+
     /* Retain a pointer to the dispatch_table and a copy of the magic
      * number, if one was provided. */
-    if (fIsSet(mode_flag,NC_UDF0))
-    {
-        UDF0_dispatch_table = dispatch_table;
-        if (magic_number)
-            strncpy(UDF0_magic_number, magic_number, NC_MAX_MAGIC_NUMBER_LEN);
-    }
-    else if(fIsSet(mode_flag, NC_UDF1))
-    {
-        UDF1_dispatch_table = dispatch_table;
-        if (magic_number)
-            strncpy(UDF1_magic_number, magic_number, NC_MAX_MAGIC_NUMBER_LEN);
-    }
-    else
-    {
-        return NC_EINVAL;
-    }
+    UDF_dispatch_tables[udf_index] = dispatch_table;
+    if (magic_number)
+        strncpy(UDF_magic_numbers[udf_index], magic_number, NC_MAX_MAGIC_NUMBER_LEN);
 
     return NC_NOERR;
 }
@@ -178,25 +195,18 @@ nc_def_user_format(int mode_flag, NC_Dispatch *dispatch_table, char *magic_numbe
 int
 nc_inq_user_format(int mode_flag, NC_Dispatch **dispatch_table, char *magic_number)
 {
-    /* Check inputs. */
-    if (fIsSet(mode_flag,NC_UDF0))
-    {
-        if (dispatch_table)
-            *dispatch_table = UDF0_dispatch_table;
-        if (magic_number)
-            strncpy(magic_number, UDF0_magic_number, NC_MAX_MAGIC_NUMBER_LEN);
-    }
-    else if(fIsSet(mode_flag,NC_UDF1))
-    {
-        if (dispatch_table)
-            *dispatch_table = UDF1_dispatch_table;
-        if (magic_number)
-            strncpy(magic_number, UDF1_magic_number, NC_MAX_MAGIC_NUMBER_LEN);
-    }
-    else
-    {
+    int udf_index;
+
+    /* Get the UDF index from the mode flag. */
+    udf_index = udf_mode_to_index(mode_flag);
+    if (udf_index < 0 || udf_index >= NC_MAX_UDF_FORMATS)
         return NC_EINVAL;
-    }
+
+    /* Return the dispatch table and magic number. */
+    if (dispatch_table)
+        *dispatch_table = UDF_dispatch_tables[udf_index];
+    if (magic_number)
+        strncpy(magic_number, UDF_magic_numbers[udf_index], NC_MAX_MAGIC_NUMBER_LEN);
 
     return NC_NOERR;
 }
@@ -1908,10 +1918,20 @@ NC_create(const char *path0, int cmode, size_t initialsz,
 #endif
 #ifdef USE_NETCDF4
     case NC_FORMATX_UDF0:
-        dispatcher = UDF0_dispatch_table;
-        break;
     case NC_FORMATX_UDF1:
-        dispatcher = UDF1_dispatch_table;
+    case NC_FORMATX_UDF2:
+    case NC_FORMATX_UDF3:
+    case NC_FORMATX_UDF4:
+    case NC_FORMATX_UDF5:
+    case NC_FORMATX_UDF6:
+    case NC_FORMATX_UDF7:
+    case NC_FORMATX_UDF8:
+    case NC_FORMATX_UDF9:
+        {
+            int udf_index = udf_formatx_to_index(model);
+            if (udf_index >= 0 && udf_index < NC_MAX_UDF_FORMATS)
+                dispatcher = UDF_dispatch_tables[udf_index];
+        }
         break;
 #endif /* USE_NETCDF4 */
 #ifdef NETCDF_ENABLE_NCZARR
@@ -2058,10 +2078,12 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
 #ifdef NETCDF_ENABLE_NCZARR
 	nczarrbuilt = 1;
 #endif
-        if(UDF0_dispatch_table != NULL)
-            udf0built = 1;
-        if(UDF1_dispatch_table != NULL)
-            udf1built = 1;
+        /* Check which UDF formats are built */
+        int udfbuilt[NC_MAX_UDF_FORMATS] = {0};
+        for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
+            if(UDF_dispatch_tables[i] != NULL)
+                udfbuilt[i] = 1;
+        }
 
         if(!hdf5built && model.impl == NC_FORMATX_NC4)
         {stat = NC_ENOTBUILT; goto done;}
@@ -2071,10 +2093,12 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
         {stat = NC_ENOTBUILT; goto done;}
 	if(!nczarrbuilt && model.impl == NC_FORMATX_NCZARR)
         {stat = NC_ENOTBUILT; goto done;}
-        if(!udf0built && model.impl == NC_FORMATX_UDF0)
-        {stat = NC_ENOTBUILT; goto done;}
-        if(!udf1built && model.impl == NC_FORMATX_UDF1)
-        {stat = NC_ENOTBUILT; goto done;}
+        /* Check all UDF formats */
+        for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
+            int formatx = (i <= 1) ? (NC_FORMATX_UDF0 + i) : (NC_FORMATX_UDF2 + i - 2);
+            if(!udfbuilt[i] && model.impl == formatx)
+                {stat = NC_ENOTBUILT; goto done;}
+        }
     }
 #else
     {
@@ -2099,10 +2123,13 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
 		| (1<<NC_FORMATX_PNETCDF)
 #endif
 		; /* end of the built flags */
-        if(UDF0_dispatch_table != NULL)
-	    built |= (1<<NC_FORMATX_UDF0);
-        if(UDF1_dispatch_table != NULL)
-	    built |= (1<<NC_FORMATX_UDF1);
+        /* Add UDF formats to built flags */
+        for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
+            if(UDF_dispatch_tables[i] != NULL) {
+                int formatx = (i <= 1) ? (NC_FORMATX_UDF0 + i) : (NC_FORMATX_UDF2 + i - 2);
+                built |= (1<<formatx);
+            }
+        }
 	/* Verify */
 	if((built & (1 << model.impl)) == 0)
             {stat = NC_ENOTBUILT; goto done;}
@@ -2148,10 +2175,20 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
 #endif
 #ifdef USE_NETCDF4
         case NC_FORMATX_UDF0:
-            dispatcher = UDF0_dispatch_table;
-            break;
         case NC_FORMATX_UDF1:
-            dispatcher = UDF1_dispatch_table;
+        case NC_FORMATX_UDF2:
+        case NC_FORMATX_UDF3:
+        case NC_FORMATX_UDF4:
+        case NC_FORMATX_UDF5:
+        case NC_FORMATX_UDF6:
+        case NC_FORMATX_UDF7:
+        case NC_FORMATX_UDF8:
+        case NC_FORMATX_UDF9:
+            {
+                int udf_index = udf_formatx_to_index(model);
+                if (udf_index >= 0 && udf_index < NC_MAX_UDF_FORMATS)
+                    dispatcher = UDF_dispatch_tables[udf_index];
+            }
             break;
 #endif /* USE_NETCDF4 */
         case NC_FORMATX_NC3:
