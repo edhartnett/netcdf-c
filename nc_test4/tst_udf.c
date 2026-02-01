@@ -270,9 +270,10 @@ static NC_Dispatch tst_dispatcher_bad_version = {
 #endif
 };
 
-#define NUM_UDFS 2
+#define NUM_UDFS 10
 
-int mode[NUM_UDFS] = {NC_UDF0, NC_UDF1};
+int mode[NUM_UDFS] = {NC_UDF0, NC_UDF1, NC_UDF2, NC_UDF3, NC_UDF4,
+                      NC_UDF5, NC_UDF6, NC_UDF7, NC_UDF8, NC_UDF9};
 
 int
 main(int argc, char **argv)
