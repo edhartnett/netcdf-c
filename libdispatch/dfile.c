@@ -45,11 +45,17 @@
 #endif
 
 
-/* User-defined formats. */
+/* User-defined formats - expanded from 2 to 10 slots.
+ * These arrays store dispatch tables and magic numbers for up to 10 custom formats.
+ * Array-based design replaces the previous individual UDF0/UDF1 global variables. */
 NC_Dispatch *UDF_dispatch_tables[NC_MAX_UDF_FORMATS] = {NULL};
 char UDF_magic_numbers[NC_MAX_UDF_FORMATS][NC_MAX_MAGIC_NUMBER_LEN + 1] = {{0}};
 
-/* Helper function to convert NC_UDFn mode flag to array index (0-9) */
+/** Helper function to convert NC_UDFn mode flag to array index (0-9).
+ * @param mode_flag The mode flag (NC_UDF0 through NC_UDF9)
+ * @return Array index 0-9, or -1 if not a valid UDF flag
+ * @note UDF flags are not sequential in bit positions due to conflicts with
+ *       NC_NOATTCREORD (0x20000) and NC_NODIMSCALE_ATTACH (0x40000) */
 static int udf_mode_to_index(int mode_flag) {
     if (fIsSet(mode_flag, NC_UDF0)) return 0;
     if (fIsSet(mode_flag, NC_UDF1)) return 1;
@@ -64,10 +70,16 @@ static int udf_mode_to_index(int mode_flag) {
     return -1;
 }
 
-/* Helper function to convert NC_FORMATX_UDFn to array index (0-9) */
+/** Helper function to convert NC_FORMATX_UDFn to array index (0-9).
+ * @param formatx The format constant (NC_FORMATX_UDF0 through NC_FORMATX_UDF9)
+ * @return Array index 0-9, or -1 if not a valid UDF format constant
+ * @note Handles the gap in format numbering: UDF0=8, UDF1=9, UDF2=11, UDF3=12, etc.
+ *       (NC_FORMATX_NCZARR=10 occupies the slot between UDF1 and UDF2) */
 static int udf_formatx_to_index(int formatx) {
+    /* UDF0 and UDF1 are sequential (8, 9) */
     if (formatx >= NC_FORMATX_UDF0 && formatx <= NC_FORMATX_UDF1)
         return formatx - NC_FORMATX_UDF0;
+    /* UDF2-UDF9 start at 11 (skipping NCZARR at 10) */
     if (formatx >= NC_FORMATX_UDF2 && formatx <= NC_FORMATX_UDF9)
         return formatx - NC_FORMATX_UDF2 + 2;
     return -1;
@@ -172,6 +184,7 @@ nc_def_user_format(int mode_flag, NC_Dispatch *dispatch_table, char *magic_numbe
     UDF_dispatch_tables[udf_index] = dispatch_table;
     if (magic_number) {
         strncpy(UDF_magic_numbers[udf_index], magic_number, NC_MAX_MAGIC_NUMBER_LEN);
+        /* Ensure null-termination since strncpy doesn't guarantee it if source >= max length */
         UDF_magic_numbers[udf_index][NC_MAX_MAGIC_NUMBER_LEN] = '\0';
     }
 
@@ -1930,12 +1943,15 @@ NC_create(const char *path0, int cmode, size_t initialsz,
     case NC_FORMATX_UDF8:
     case NC_FORMATX_UDF9:
         {
-            int udf_index = udf_formatx_to_index(model);
+            /* Convert format constant to array index and validate */
+            int udf_index = udf_formatx_to_index(model.impl);
             if (udf_index < 0 || udf_index >= NC_MAX_UDF_FORMATS) {
                 stat = NC_EINVAL;
                 goto done;
             }
+            /* Get the dispatch table for this UDF slot */
             dispatcher = UDF_dispatch_tables[udf_index];
+            /* Ensure the UDF format has been registered via nc_def_user_format() */
             if (!dispatcher) {
                 stat = NC_ENOTBUILT;
                 goto done;
@@ -2087,7 +2103,8 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
 #ifdef NETCDF_ENABLE_NCZARR
 	nczarrbuilt = 1;
 #endif
-        /* Check which UDF formats are built */
+        /* Check which UDF formats are built (i.e., have been registered).
+         * A UDF format is considered "built" if its dispatch table is non-NULL. */
         int udfbuilt[NC_MAX_UDF_FORMATS] = {0};
         for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
             if(UDF_dispatch_tables[i] != NULL)
@@ -2102,8 +2119,9 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
         {stat = NC_ENOTBUILT; goto done;}
 	if(!nczarrbuilt && model.impl == NC_FORMATX_NCZARR)
         {stat = NC_ENOTBUILT; goto done;}
-        /* Check all UDF formats */
+        /* Check all UDF formats - ensure the requested format has been registered */
         for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
+            /* Convert array index to format constant (handles gap: UDF0=8, UDF1=9, UDF2=11...) */
             int formatx = (i <= 1) ? (NC_FORMATX_UDF0 + i) : (NC_FORMATX_UDF2 + i - 2);
             if(!udfbuilt[i] && model.impl == formatx)
                 {stat = NC_ENOTBUILT; goto done;}
@@ -2132,14 +2150,16 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
 		| (1<<NC_FORMATX_PNETCDF)
 #endif
 		; /* end of the built flags */
-        /* Add UDF formats to built flags */
+        /* Add UDF formats to built flags - set bit for each registered UDF format.
+         * Use unsigned literal (1U) to avoid integer overflow for higher bit positions. */
         for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
             if(UDF_dispatch_tables[i] != NULL) {
+                /* Convert array index to format constant */
                 int formatx = (i <= 1) ? (NC_FORMATX_UDF0 + i) : (NC_FORMATX_UDF2 + i - 2);
                 built |= (1U << formatx);
             }
         }
-	/* Verify */
+	/* Verify the requested format is available */
 	if((built & (1U << model.impl)) == 0)
             {stat = NC_ENOTBUILT; goto done;}
 #ifndef NETCDF_ENABLE_CDF5
@@ -2194,12 +2214,15 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
         case NC_FORMATX_UDF8:
         case NC_FORMATX_UDF9:
             {
-                int udf_index = udf_formatx_to_index(model);
+                /* Convert format constant to array index and validate */
+                int udf_index = udf_formatx_to_index(model.impl);
                 if (udf_index < 0 || udf_index >= NC_MAX_UDF_FORMATS) {
                     stat = NC_EINVAL;
                     goto done;
                 }
+                /* Get the dispatch table for this UDF slot */
                 dispatcher = UDF_dispatch_tables[udf_index];
+                /* Ensure the UDF format has been registered via nc_def_user_format() */
                 if (!dispatcher) {
                     stat = NC_ENOTBUILT;
                     goto done;

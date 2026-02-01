@@ -64,3 +64,79 @@ build_llvm
 .vagrant
 Vagrantfile
 netcdf-fortran
+
+# Autotools build artifacts
+config.h
+config.log
+config.status
+libtool
+stamp-h1
+VERSION
+netcdf.pc
+libnetcdf.settings
+nc-config
+comps.txt
+
+# Generated shell scripts
+**/findplugin.sh
+**/run_par_test.sh
+**/run_par_tests.sh
+**/run_par_bm_test.sh
+**/run_par_warn_test.sh
+**/run_pnetcdf_tests.sh
+**/run_gfs_test.sh
+**/run_filter_*.sh
+**/run_filterinstall.sh
+**/run_mud.sh
+**/run_nccopy5.sh
+**/run_specific_filters.sh
+**/run_unknown.sh
+test_common.sh
+s3cleanup.sh
+s3gc.sh
+
+# Generated headers
+include/netcdf_dispatch.h
+include/netcdf_json.h
+include/netcdf_proplist.h
+
+# Built executables
+ncdump/echon
+ncdump/nc4print
+ncdump/nccopy
+ncdump/ncdump
+ncdump/ncfilteravail
+ncdump/nchdf5version
+ncdump/ncpathcvt
+ncdump/ncvalidator
+ncdump/printfqn
+ncgen/ncgen
+ncgen3/ncgen3
+nczarr_test/ncdumpchunks
+nczarr_test/zhex
+nczarr_test/zisjson
+nczarr_test/zmapio
+nczarr_test/zs3parse
+libdispatch/ncrandom
+unit_test/ncpluginpath
+
+# Generated man pages
+libsrc/netcdf.3
+
+# Generated test files
+nczarr_test/test_chunking.c
+nczarr_test/test_endians.c
+nczarr_test/test_filter.c
+nczarr_test/test_filter_misc.c
+nczarr_test/test_filter_order.c
+nczarr_test/test_filter_repeat.c
+nczarr_test/test_filter_vlen.c
+nczarr_test/test_put_vars_two_unlim_dim.c
+nczarr_test/test_quantize.c
+nczarr_test/test_unlim_vars.c
+nczarr_test/timer_utils.c
+nczarr_test/timer_utils.h
+nczarr_test/tst_multifilter.c
+
+# Generated plugin files
+plugins/H5Znoop1.c

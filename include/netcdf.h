@@ -145,14 +145,16 @@ extern "C" {
 
 #define NC_UDF0          0x0040  /**< User-defined format 0. */
 #define NC_UDF1          0x0080  /**< User-defined format 1. */
-#define NC_UDF2          0x10000  /**< User-defined format 2. */
-#define NC_UDF3          0x80000  /**< User-defined format 3. */
-#define NC_UDF4          0x100000  /**< User-defined format 4. */
-#define NC_UDF5          0x200000  /**< User-defined format 5. */
-#define NC_UDF6          0x400000  /**< User-defined format 6. */
-#define NC_UDF7          0x800000  /**< User-defined format 7. */
-#define NC_UDF8          0x1000000  /**< User-defined format 8. */
-#define NC_UDF9          0x2000000  /**< User-defined format 9. */
+/* UDF2-UDF9 use bits 16, 19-25 (skipping bits 17-18 which are used by
+ * NC_NOATTCREORD=0x20000 and NC_NODIMSCALE_ATTACH=0x40000) */
+#define NC_UDF2          0x10000  /**< User-defined format 2 (bit 16). */
+#define NC_UDF3          0x80000  /**< User-defined format 3 (bit 19). */
+#define NC_UDF4          0x100000  /**< User-defined format 4 (bit 20). */
+#define NC_UDF5          0x200000  /**< User-defined format 5 (bit 21). */
+#define NC_UDF6          0x400000  /**< User-defined format 6 (bit 22). */
+#define NC_UDF7          0x800000  /**< User-defined format 7 (bit 23). */
+#define NC_UDF8          0x1000000  /**< User-defined format 8 (bit 24). */
+#define NC_UDF9          0x2000000  /**< User-defined format 9 (bit 25). */
 
 #define NC_CLASSIC_MODEL 0x0100 /**< Enforce classic model on netCDF-4. Mode flag for nc_create(). */
 #define NC_64BIT_OFFSET  0x0200  /**< Use large (64-bit) file offsets. Mode flag for nc_create(). */
