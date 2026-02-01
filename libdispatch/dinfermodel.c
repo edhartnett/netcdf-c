@@ -760,13 +760,12 @@ NC_omodeinfer(int useparallel, int cmode, NCmodel* model)
      * use some of the other flags, like NC_NETCDF4, so we must first
      * check NC_UDF0-NC_UDF9 before checking for any other flag. */
     int udf_found = 0;
+    static const int udf_flags[NC_MAX_UDF_FORMATS] = {
+        NC_UDF0, NC_UDF1, NC_UDF2, NC_UDF3, NC_UDF4,
+        NC_UDF5, NC_UDF6, NC_UDF7, NC_UDF8, NC_UDF9
+    };
     for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
-        int udf_flag;
-        if(i == 0) udf_flag = NC_UDF0;
-        else if(i == 1) udf_flag = NC_UDF1;
-        else udf_flag = NC_UDF2 << (i - 2);
-        
-        if(fIsSet(cmode, udf_flag)) {
+        if(fIsSet(cmode, udf_flags[i])) {
             int formatx = (i <= 1) ? (NC_FORMATX_UDF0 + i) : (NC_FORMATX_UDF2 + i - 2);
             model->impl = formatx;
             udf_found = 1;

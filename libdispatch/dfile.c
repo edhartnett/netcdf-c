@@ -170,8 +170,10 @@ nc_def_user_format(int mode_flag, NC_Dispatch *dispatch_table, char *magic_numbe
     /* Retain a pointer to the dispatch_table and a copy of the magic
      * number, if one was provided. */
     UDF_dispatch_tables[udf_index] = dispatch_table;
-    if (magic_number)
+    if (magic_number) {
         strncpy(UDF_magic_numbers[udf_index], magic_number, NC_MAX_MAGIC_NUMBER_LEN);
+        UDF_magic_numbers[udf_index][NC_MAX_MAGIC_NUMBER_LEN] = '\0';
+    }
 
     return NC_NOERR;
 }
@@ -1929,8 +1931,15 @@ NC_create(const char *path0, int cmode, size_t initialsz,
     case NC_FORMATX_UDF9:
         {
             int udf_index = udf_formatx_to_index(model);
-            if (udf_index >= 0 && udf_index < NC_MAX_UDF_FORMATS)
-                dispatcher = UDF_dispatch_tables[udf_index];
+            if (udf_index < 0 || udf_index >= NC_MAX_UDF_FORMATS) {
+                stat = NC_EINVAL;
+                goto done;
+            }
+            dispatcher = UDF_dispatch_tables[udf_index];
+            if (!dispatcher) {
+                stat = NC_ENOTBUILT;
+                goto done;
+            }
         }
         break;
 #endif /* USE_NETCDF4 */
@@ -2127,11 +2136,11 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
         for(int i = 0; i < NC_MAX_UDF_FORMATS; i++) {
             if(UDF_dispatch_tables[i] != NULL) {
                 int formatx = (i <= 1) ? (NC_FORMATX_UDF0 + i) : (NC_FORMATX_UDF2 + i - 2);
-                built |= (1<<formatx);
+                built |= (1U << formatx);
             }
         }
 	/* Verify */
-	if((built & (1 << model.impl)) == 0)
+	if((built & (1U << model.impl)) == 0)
             {stat = NC_ENOTBUILT; goto done;}
 #ifndef NETCDF_ENABLE_CDF5
 	/* Special case because there is no separate CDF5 dispatcher */
@@ -2186,8 +2195,15 @@ NC_open(const char *path0, int omode, int basepe, size_t *chunksizehintp,
         case NC_FORMATX_UDF9:
             {
                 int udf_index = udf_formatx_to_index(model);
-                if (udf_index >= 0 && udf_index < NC_MAX_UDF_FORMATS)
-                    dispatcher = UDF_dispatch_tables[udf_index];
+                if (udf_index < 0 || udf_index >= NC_MAX_UDF_FORMATS) {
+                    stat = NC_EINVAL;
+                    goto done;
+                }
+                dispatcher = UDF_dispatch_tables[udf_index];
+                if (!dispatcher) {
+                    stat = NC_ENOTBUILT;
+                    goto done;
+                }
             }
             break;
 #endif /* USE_NETCDF4 */
