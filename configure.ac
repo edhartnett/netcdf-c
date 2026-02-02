@@ -2127,6 +2127,7 @@ AC_SUBST(HAS_DEFLATE,[$have_deflate])
 AC_SUBST(HAS_SZLIB,[$have_sz])
 AC_SUBST(HAS_SZLIB_WRITE, [$have_sz])
 AC_SUBST(HAS_ZSTD,[$have_zstd])
+AC_SUBST(HAS_UDF_SELF_LOAD,[yes])
 AC_SUBST(DO_LARGE_TESTS,[$enable_large_file_tests])
 AC_SUBST(DO_REMOTE_FUNCTIONALITY,[$enable_remote_functionality])
 
