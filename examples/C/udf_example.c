@@ -5,7 +5,7 @@
    Example of implementing and using a user-defined format (UDF).
    This demonstrates the basic structure needed for a UDF implementation.
 
-   Ed Hartnett
+   Edward Hartnett, 2/2/25
 */
 
 #include <config.h>

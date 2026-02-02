@@ -30,6 +30,9 @@
  *
  * @param path Full path to the library file.
  * @return Handle to the loaded library, or NULL on failure.
+ *
+ * @author Edward Hartnett
+ * @date 2/2/25
  */
 static void*
 load_library(const char* path)
@@ -58,6 +61,9 @@ load_library(const char* path)
  * @param handle Handle to the loaded library.
  * @param symbol Name of the symbol to retrieve.
  * @return Pointer to the symbol, or NULL on failure.
+ *
+ * @author Edward Hartnett
+ * @date 2/2/25
  */
 static void*
 get_symbol(void* handle, const char* symbol)
@@ -88,6 +94,9 @@ get_symbol(void* handle, const char* symbol)
  * @param init_func Name of the initialization function.
  * @param magic Optional magic number string (can be NULL).
  * @return NC_NOERR on success, error code on failure.
+ *
+ * @author Edward Hartnett
+ * @date 2/2/25
  */
 static int
 load_udf_plugin(int udf_number, const char* library_path,
@@ -174,6 +183,9 @@ done:
  * present for a slot, it attempts to load that plugin.
  *
  * @return NC_NOERR (always succeeds, even if plugins fail to load).
+ *
+ * @author Edward Hartnett
+ * @date 2/2/25
  */
 int
 NC_udf_load_plugins(void)

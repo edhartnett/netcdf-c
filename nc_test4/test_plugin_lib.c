@@ -3,10 +3,21 @@
    for conditions of use.
 
    Test plugin library for UDF RC loading tests.
-   This is a minimal plugin that can be dynamically loaded to test
-   the RC-based plugin loading mechanism.
+   
+   This is a minimal plugin library that can be dynamically loaded to test
+   the RC-based plugin loading mechanism. It provides:
+   
+   1. A minimal dispatch table with stub implementations
+   2. Multiple initialization functions to test different scenarios:
+      - test_plugin_init() - Normal initialization for UDF0
+      - test_plugin_init_udf2() - Initialization for UDF2 slot
+      - test_plugin_init_fail() - Intentionally failing init for error testing
+   3. A magic number ("TSTPLG") for automatic format detection
+   
+   This library is compiled as a shared library (.so/.dylib/.dll) and loaded
+   dynamically by the netCDF library when configured via RC files.
 
-   Ed Hartnett
+   Edward Hartnett, 2/2/25
 */
 
 #include "config.h"
@@ -16,9 +27,12 @@
 #include "hdf5dispatch.h"
 #include "netcdf_dispatch.h"
 
+/* Magic number that identifies files handled by this plugin */
 #define TEST_PLUGIN_MAGIC "TSTPLG"
 
-/* Minimal dispatch function implementations */
+/* Minimal dispatch function implementations 
+ * These are stub functions that do minimal work - just enough to test
+ * that the plugin loading mechanism works correctly. */
 static int
 test_plugin_open(const char *path, int mode, int basepe, size_t *chunksizehintp,
                  void *parameters, const NC_Dispatch *dispatch, int ncid)
@@ -63,7 +77,13 @@ test_plugin_get_vara(int ncid, int varid, const size_t *start, const size_t *cou
     return NC_NOERR;
 }
 
-/* Dispatch table for test plugin - uses UDF0 format */
+/* Dispatch table for test plugin - uses UDF0 format
+ * 
+ * This table maps netCDF API calls to implementation functions.
+ * Most functions use read-only stubs (NC_RO_*) or NC4/HDF5 defaults
+ * since this is just a test plugin. A real plugin would implement
+ * custom versions of these functions to handle its specific format.
+ */
 static NC_Dispatch test_plugin_dispatcher = {
     NC_FORMATX_UDF0,
     NC_DISPATCH_VERSION,
@@ -163,13 +183,24 @@ static NC_Dispatch test_plugin_dispatcher = {
 #endif
 };
 
-/* Initialization function called by plugin loader */
+/* Initialization function called by plugin loader
+ * 
+ * This function is called when the plugin is loaded via RC file configuration.
+ * The RC file specifies this function name in the NETCDF.UDF0.INIT key.
+ * 
+ * It registers the dispatch table with the netCDF library, associating it with:
+ * - The UDF0 slot (NC_UDF0 mode flag)
+ * - The magic number "TSTPLG" for automatic format detection
+ * 
+ * Returns NC_NOERR on success, error code on failure.
+ */
 int
 test_plugin_init(void)
 {
     int ret;
     
-    /* Register the dispatch table with magic number */
+    /* Register the dispatch table with magic number.
+     * After this, files starting with "TSTPLG" will be handled by this plugin. */
     if ((ret = nc_def_user_format(NC_UDF0 | NC_NETCDF4, &test_plugin_dispatcher, 
                                    TEST_PLUGIN_MAGIC)))
         return ret;
@@ -177,13 +208,23 @@ test_plugin_init(void)
     return NC_NOERR;
 }
 
-/* Alternative init function for testing different UDF slots */
+/* Alternative init function for testing different UDF slots
+ * 
+ * This function tests that plugins can be loaded into different UDF slots.
+ * It registers the same dispatch table in the UDF2 slot instead of UDF0,
+ * with a different magic number ("TSTPL2").
+ * 
+ * This allows testing:
+ * - Multiple UDF slots can be used simultaneously
+ * - Different magic numbers can be registered for different slots
+ * - RC file can specify different init functions for different slots
+ */
 int
 test_plugin_init_udf2(void)
 {
     int ret;
     
-    /* Register in UDF2 slot */
+    /* Register in UDF2 slot with different magic number */
     if ((ret = nc_def_user_format(NC_UDF2 | NC_NETCDF4, &test_plugin_dispatcher, 
                                    "TSTPL2")))
         return ret;
@@ -191,9 +232,19 @@ test_plugin_init_udf2(void)
     return NC_NOERR;
 }
 
-/* Init function that intentionally fails for error testing */
+/* Init function that intentionally fails for error testing
+ * 
+ * This function is used to test error handling in the plugin loading code.
+ * It returns NC_EINVAL to simulate a plugin initialization failure.
+ * 
+ * Tests should verify that:
+ * - The error is properly detected and reported
+ * - The plugin is not registered when init fails
+ * - The library continues to function normally after the failure
+ */
 int
 test_plugin_init_fail(void)
 {
+    /* Intentionally return error to test error handling */
     return NC_EINVAL;
 }

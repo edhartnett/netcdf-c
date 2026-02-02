@@ -1,6 +1,8 @@
 /* Test program for Simple UDF Plugin
  * This program demonstrates both automatic loading (via RC file)
  * and programmatic registration of the plugin.
+ *
+ * Edward Hartnett, 2/2/25
  */
 
 #include <netcdf.h>

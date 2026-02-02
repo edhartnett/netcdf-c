@@ -26,6 +26,9 @@ extern "C" {
  * 
  * @return NC_NOERR on success (even if no plugins are configured or
  *         some plugins fail to load), error code on critical failure.
+ *
+ * @author Edward Hartnett
+ * @date 2/2/25
  */
 EXTERNL int NC_udf_load_plugins(void);
 

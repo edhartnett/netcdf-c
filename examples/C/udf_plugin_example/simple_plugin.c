@@ -1,5 +1,7 @@
 /* Simple UDF Plugin Example
  * This plugin can be dynamically loaded via RC file configuration.
+ *
+ * Edward Hartnett, 2/2/25
  */
 
 #include <netcdf.h>
