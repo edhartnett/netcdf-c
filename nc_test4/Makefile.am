@@ -153,7 +153,7 @@ tst_filter_misc.sh run_zstd_test.sh run_par_warn_test.sh.in		\
 ref_tmp_tst_warn_out.txt run_zero_len_att_test.sh
 
 CLEANFILES = tst_mpi_parallel.bin cdm_sea_soundings.nc bm_chunking.nc	\
-tst_floats_1D.cdl floats_1D_3.nc floats_1D.cdl tst_*.nc tmp_*.txt       \
+tst_floats_1D.cdl floats_1D_3.nc floats_1D.cdl tst_*.nc test_*.nc tmp_*.txt       \
 tst_floats2_*.cdl tst_ints2_*.cdl tst_shorts2_*.cdl tst_elena_*.cdl	\
 tst_simple*.cdl tst_chunks.cdl pr_A1.* tauu_A1.* usi_01.* thetau_01.*	\
 tst_*.h5 tst_grp_rename.cdl tst_grp_rename.dmp ref_grp_rename.cdl	\
