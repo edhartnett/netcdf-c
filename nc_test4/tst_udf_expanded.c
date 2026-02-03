@@ -6,7 +6,7 @@
    
    This test program verifies the infrastructure for 10 UDF slots by testing:
    
-   1. Mode flags (NC_UDF0-NC_UDF9) are unique and properly defined
+   1. Mode flags (NC_UDF0-NC_UDF9) are unique and properly defined.
    2. Format constants (NC_FORMATX_UDF0-UDF9) are unique and in correct range
    3. NC_MAX_UDF_FORMATS constant is set to 10
    4. All 10 UDF slots can be registered simultaneously
