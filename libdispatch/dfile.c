@@ -53,21 +53,30 @@ char UDF_magic_numbers[NC_MAX_UDF_FORMATS][NC_MAX_MAGIC_NUMBER_LEN + 1] = {{0}};
 
 /** Helper function to convert NC_UDFn mode flag to array index (0-9).
  * @param mode_flag The mode flag (NC_UDF0 through NC_UDF9)
- * @return Array index 0-9, or -1 if not a valid UDF flag
+ * @return Array index 0-9, or -1 if not a valid UDF flag or multiple UDF flags set
  * @note UDF flags are not sequential in bit positions due to conflicts with
  *       NC_NOATTCREORD (0x20000) and NC_NODIMSCALE_ATTACH (0x40000) */
 static int udf_mode_to_index(int mode_flag) {
-    if (fIsSet(mode_flag, NC_UDF0)) return 0;
-    if (fIsSet(mode_flag, NC_UDF1)) return 1;
-    if (fIsSet(mode_flag, NC_UDF2)) return 2;
-    if (fIsSet(mode_flag, NC_UDF3)) return 3;
-    if (fIsSet(mode_flag, NC_UDF4)) return 4;
-    if (fIsSet(mode_flag, NC_UDF5)) return 5;
-    if (fIsSet(mode_flag, NC_UDF6)) return 6;
-    if (fIsSet(mode_flag, NC_UDF7)) return 7;
-    if (fIsSet(mode_flag, NC_UDF8)) return 8;
-    if (fIsSet(mode_flag, NC_UDF9)) return 9;
-    return -1;
+    int count = 0;
+    int index = -1;
+    
+    /* Count how many UDF flags are set and remember the index */
+    if (fIsSet(mode_flag, NC_UDF0)) { count++; index = 0; }
+    if (fIsSet(mode_flag, NC_UDF1)) { count++; index = 1; }
+    if (fIsSet(mode_flag, NC_UDF2)) { count++; index = 2; }
+    if (fIsSet(mode_flag, NC_UDF3)) { count++; index = 3; }
+    if (fIsSet(mode_flag, NC_UDF4)) { count++; index = 4; }
+    if (fIsSet(mode_flag, NC_UDF5)) { count++; index = 5; }
+    if (fIsSet(mode_flag, NC_UDF6)) { count++; index = 6; }
+    if (fIsSet(mode_flag, NC_UDF7)) { count++; index = 7; }
+    if (fIsSet(mode_flag, NC_UDF8)) { count++; index = 8; }
+    if (fIsSet(mode_flag, NC_UDF9)) { count++; index = 9; }
+    
+    /* Only one UDF flag should be set at a time */
+    if (count != 1)
+        return -1;
+    
+    return index;
 }
 
 /** Helper function to convert NC_FORMATX_UDFn to array index (0-9).

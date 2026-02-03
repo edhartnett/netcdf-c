@@ -56,6 +56,12 @@ int test_inq_format_extended(int ncid, int *formatp, int *modep)
     return NC_NOERR;
 }
 
+int test_get_vara(int ncid, int varid, const size_t *start, const size_t *count,
+                  void *value, nc_type memtype)
+{
+    return NC_NOERR;
+}
+
 /* Minimal dispatch table for testing */
 static NC_Dispatch test_dispatcher = {
     NC_FORMATX_UDF0,
@@ -68,7 +74,7 @@ static NC_Dispatch test_dispatcher = {
     NC4_inq_att, NC4_inq_attid, NC4_inq_attname, NC_RO_rename_att, NC_RO_del_att,
     NC4_get_att, NC_RO_put_att,
     NC_RO_def_var, NC4_inq_varid, NC_RO_rename_var,
-    NC_RO_put_vara, NC_RO_put_vara, NCDEFAULT_get_vars, NCDEFAULT_put_vars,
+    test_get_vara, NC_RO_put_vara, NCDEFAULT_get_vars, NCDEFAULT_put_vars,
     NCDEFAULT_get_varm, NCDEFAULT_put_varm,
     NC4_inq_var_all, NC_NOTNC4_var_par_access, NC_RO_def_var_fill,
     NC4_show_metadata, NC4_inq_unlimdims,
