@@ -1,0 +1,38 @@
+# Makefile for Simple UDF Plugin Example
+# Copy this to Makefile and adjust paths as needed
+
+CC = gcc
+CFLAGS = -fPIC -Wall -I/usr/local/include
+LDFLAGS = -shared -L/usr/local/lib -lnetcdf
+
+# Adjust these paths for your system
+NETCDF_INCLUDE = /usr/local/include
+NETCDF_LIB = /usr/local/lib
+
+# Plugin library name
+PLUGIN = libsimpleplugin.so
+
+# macOS uses .dylib extension
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    PLUGIN = libsimpleplugin.dylib
+    LDFLAGS = -dynamiclib -L$(NETCDF_LIB) -lnetcdf
+endif
+
+all: $(PLUGIN) test_plugin
+
+$(PLUGIN): simple_plugin.c
+	$(CC) $(CFLAGS) -I$(NETCDF_INCLUDE) $(LDFLAGS) -o $@ $<
+
+test_plugin: test_plugin.c
+	$(CC) $(CFLAGS) -I$(NETCDF_INCLUDE) -L$(NETCDF_LIB) -o $@ $< -lnetcdf
+
+clean:
+	rm -f $(PLUGIN) test_plugin *.o
+
+install: $(PLUGIN)
+	@echo "Installing plugin to /usr/local/lib (may require sudo)"
+	@echo "Or copy to a user directory: cp $(PLUGIN) ~/lib/"
+	sudo cp $(PLUGIN) /usr/local/lib/
+
+.PHONY: all clean install

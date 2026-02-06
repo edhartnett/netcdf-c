@@ -1,0 +1,19 @@
+# Example RC file for Simple UDF Plugin
+# Copy this to ~/.ncrc and adjust the library path
+
+# Configure UDF0 to load the simple plugin
+# IMPORTANT: Use absolute path to the plugin library
+NETCDF.UDF0.LIBRARY=/usr/local/lib/libsimpleplugin.so
+NETCDF.UDF0.INIT=simple_plugin_init
+NETCDF.UDF0.MAGIC=SIMPLE
+
+# On macOS, use .dylib extension:
+# NETCDF.UDF0.LIBRARY=/usr/local/lib/libsimpleplugin.dylib
+
+# On Windows, use .dll extension:
+# NETCDF.UDF0.LIBRARY=C:/Program Files/netcdf/lib/simpleplugin.dll
+
+# You can configure multiple UDF slots:
+# NETCDF.UDF1.LIBRARY=/path/to/another_plugin.so
+# NETCDF.UDF1.INIT=another_init
+# NETCDF.UDF1.MAGIC=ANOTHER

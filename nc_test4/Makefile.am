@@ -34,8 +34,9 @@ tst_atts1 tst_atts2 tst_vars2 tst_files5 tst_files6 tst_sync		\
 tst_h_scalar tst_rename tst_rename2 tst_rename3 tst_h5_endians		\
 tst_atts_string_rewrite tst_hdf5_file_compat tst_fill_attr_vanish	\
 tst_rehash tst_filterparser tst_bug324 tst_types tst_atts3		\
-tst_put_vars tst_elatefill tst_udf tst_put_vars_two_unlim_dim		\
-tst_bug1442 tst_quantize tst_h_transient_types
+tst_put_vars tst_elatefill tst_udf tst_udf_expanded tst_udf_rcplugin	\
+tst_udf_integration tst_put_vars_two_unlim_dim tst_bug1442 tst_quantize	\
+tst_h_transient_types
 
 if HAS_PAR_FILTERS
 NC4_TESTS += tst_alignment
@@ -46,7 +47,8 @@ NC4_TESTS += tst_h_strbug tst_h_refs
 # Build test programs plus programs used in test scripts.
 check_PROGRAMS = $(NC4_TESTS) tst_empty_vlen_unlim tst_charvlenbug \
 tst_vlenstr tst_zero_len_att
-TESTS = $(NC4_TESTS) run_empty_vlen_test.sh run_zero_len_att_test.sh
+TESTS = $(NC4_TESTS) run_empty_vlen_test.sh run_zero_len_att_test.sh \
+tst_udf_rcplugin.sh
 XFAIL_TESTS =
 
 # Add these if large file tests are turned on.
@@ -151,7 +153,7 @@ tst_filter_misc.sh run_zstd_test.sh run_par_warn_test.sh.in		\
 ref_tmp_tst_warn_out.txt run_zero_len_att_test.sh
 
 CLEANFILES = tst_mpi_parallel.bin cdm_sea_soundings.nc bm_chunking.nc	\
-tst_floats_1D.cdl floats_1D_3.nc floats_1D.cdl tst_*.nc tmp_*.txt       \
+tst_floats_1D.cdl floats_1D_3.nc floats_1D.cdl tst_*.nc test_*.nc tmp_*.txt       \
 tst_floats2_*.cdl tst_ints2_*.cdl tst_shorts2_*.cdl tst_elena_*.cdl	\
 tst_simple*.cdl tst_chunks.cdl pr_A1.* tauu_A1.* usi_01.* thetau_01.*	\
 tst_*.h5 tst_grp_rename.cdl tst_grp_rename.dmp ref_grp_rename.cdl	\
