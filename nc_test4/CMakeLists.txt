@@ -22,8 +22,8 @@ SET(NC4_TESTS tst_dims tst_dims2 tst_dims3 tst_files tst_files4
   tst_files6 tst_sync tst_h_strbug tst_h_refs tst_h_scalar tst_rename
   tst_rename2 tst_rename3 tst_h5_endians tst_atts_string_rewrite tst_put_vars_two_unlim_dim
   tst_hdf5_file_compat tst_fill_attr_vanish tst_rehash tst_types tst_bug324
-  tst_atts3 tst_put_vars tst_elatefill tst_udf tst_bug1442 tst_broken_files
-  tst_quantize tst_h_transient_types)
+  tst_atts3 tst_put_vars tst_elatefill tst_udf tst_udf_expanded tst_udf_rcplugin
+  tst_udf_integration tst_bug1442 tst_broken_files tst_quantize tst_h_transient_types)
 
 IF(HAS_PAR_FILTERS)
 SET(NC4_tests $NC4_TESTS tst_alignment)
@@ -86,6 +86,7 @@ ENDIF(${HDF5_VERSION} VERSION_GREATER "1.10.0")
 ##
 BUILD_BIN_TEST(tst_empty_vlen_unlim)
 ADD_SH_TEST(nc_test4 run_empty_vlen_test)
+ADD_SH_TEST(nc_test4 tst_udf_rcplugin)
 
 IF(NOT WIN32)
   SET(NC4_TESTS ${NC4_TESTS} tst_interops5 tst_camrun)
