@@ -13,7 +13,6 @@
 #include "err_macros.h"
 #include "netcdf.h"
 #include "nc4dispatch.h"
-#include "hdf5dispatch.h"
 #include "netcdf_dispatch.h"
 
 #define FILE_NAME "tst_udf.nc"
@@ -101,7 +100,7 @@ init_dispatchers(void)
 
     tst_dispatcher.def_dim = NC_RO_def_dim;
     tst_dispatcher.inq_dimid = NC4_inq_dimid;
-    tst_dispatcher.inq_dim = HDF5_inq_dim;
+    tst_dispatcher.inq_dim = NC4_inq_dim;
     tst_dispatcher.inq_unlimdim = NC4_inq_unlimdim;
     tst_dispatcher.rename_dim = NC_RO_rename_dim;
 
