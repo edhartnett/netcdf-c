@@ -12,8 +12,8 @@ export TEST_COMMON_SH=1
 # Define various global constants
 
 # Define various build and install paths
-abs_top_srcdir=@abs_top_srcdir@
-abs_top_builddir=@abs_top_builddir@
+abs_top_srcdir="@abs_top_srcdir@"
+abs_top_builddir="@abs_top_builddir@"
 TOPSRCDIR="${abs_top_srcdir}"
 TOPBUILDDIR="${abs_top_builddir}"
 
@@ -157,15 +157,15 @@ builddir=`pwd`
 execdir="${builddir}"
 
 # pick off the last component as the relative name of this directory
-thisdir=`basename $srcdir`
+thisdir=`basename "$srcdir"`
 
 WD=`pwd`
 # Absolutize paths of interest
-cd $srcdir; srcdir=`pwd` ; cd $WD
-cd $top_srcdir; top_srcdir=`pwd` ; cd $WD
-cd $builddir; builddir=`pwd` ; cd $WD
-cd $top_builddir; top_builddir=`pwd` ; cd $WD
-cd $execdir; execdir=`pwd` ; cd $WD
+cd "$srcdir"; srcdir=`pwd` ; cd "$WD"
+cd "$top_srcdir"; top_srcdir=`pwd` ; cd "$WD"
+cd "$builddir"; builddir=`pwd` ; cd "$WD"
+cd "$top_builddir"; top_builddir=`pwd` ; cd "$WD"
+cd "$execdir"; execdir=`pwd` ; cd "$WD"
 
 # For sun os
 export srcdir top_srcdir builddir top_builddir execdir
@@ -248,7 +248,7 @@ isolate() {
       if test "x$NOISOPATH" = x ; then ISOTESTSET="${ISOTESTSET}${TESTUID}"; fi    
       ISODIR="$1"
       ISOPATH="${ISOTESTSET}/$ISODIR"
-      mkdir -p $ISOPATH
+      mkdir -p "$ISOPATH"
   fi
 }
 
