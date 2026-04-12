@@ -230,7 +230,7 @@ if test yes = `${execdir}/../ncdump/ncfilteravail $1` ; then return 0 ; else ech
 }
 
 # Make sure we are in builddir (not execdir)
-cd $builddir
+cd "$builddir"
 
 # Parallel make can cause inter-test interference (mostly because of historical naming issues).
 # As a protection against this, the isolate() function supports the creation of an
