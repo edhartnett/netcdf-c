@@ -145,7 +145,7 @@ if test "x$srcdir" = x ; then
   # pick off the last component as the relative name of this directory
   srcdir=`pwd`
   if test "x$srcdir" != "x$top_srcdir" ; then
-      current=`basename $srcdir`
+      current=`basename "$srcdir"`
       srcdir="${top_srcdir}/$current"
   fi
 fi

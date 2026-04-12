@@ -10,7 +10,7 @@ if test "x$srcdir" = x ;then srcdir=`pwd`; fi
 . ../test_common.sh
 
 echo "*** creating classic file c0.nc from c0.cdl..."
-if ${NCGEN3} -b -o c0.nc ${ncgen3c0} ; then
+if "${NCGEN3}" -b -o c0.nc "${ncgen3c0}" ; then
 echo "***PASS"
 else
 echo "***fail"
