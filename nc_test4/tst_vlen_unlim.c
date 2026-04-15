@@ -27,6 +27,7 @@
 #define FILE_CHAR  "tst_vlen_unlim_char.nc"
 #define FILE_2D    "tst_vlen_unlim_2d.nc"
 #define FILE_2VAR  "tst_vlen_unlim_2var.nc"
+#define FILE_FILL "tst_vlen_unlim_fill.nc"
 
 /* ------------------------------------------------------------------ */
 /* Test 1: 1-D VLEN(int) with unlimited dim, partial write.           */
@@ -264,10 +265,86 @@ test_vlen_two_vars_unlim(void)
     return 0;
 }
 
+/* ------------------------------------------------------------------ */
+/* Test 5: exact issue #2212 reproduction.                            */
+/* VLEN(double) with fixed-size dim, custom fill value, chunking,     */
+/* and partial write.  nc_get_var returns NC_EHDFERR (-101).          */
+/* ------------------------------------------------------------------ */
+static int
+test_vlen_fill_chunked(void)
+{
+    int ncid, varid, dimid;
+    nc_type typeid;
+    int stat;
+    const size_t DATA_LENGTH = 4;
+    nc_vlen_t data[4];
+    double first[]  = {2, 5};
+    double second[] = {88, 96, 42};
+    size_t start, count;
+    nc_vlen_t fillValue;
+    double fv[] = {0, 101};
+    const size_t chunk = 1;
+    nc_vlen_t *data_read = NULL;
+
+    data[0].p = first;  data[0].len = 2;
+    data[1].p = second; data[1].len = 3;
+
+    /* Create: fixed dim of size 4, custom fill, chunking of 1. */
+    if (nc_create(FILE_FILL, NC_NETCDF4 | NC_CLOBBER, &ncid)) ERR;
+    if (nc_def_vlen(ncid, "RAGGED_DOUBLE", NC_DOUBLE, &typeid)) ERR;
+    if (nc_def_dim(ncid, "xdim", DATA_LENGTH, &dimid)) ERR;
+    if (nc_def_var(ncid, "var", typeid, 1, &dimid, &varid)) ERR;
+    if (nc_def_var_chunking(ncid, varid, NC_CHUNKED, &chunk)) ERR;
+
+    fillValue.p = fv;
+    fillValue.len = 2;
+    if (nc_def_var_fill(ncid, varid, NC_FILL, &fillValue)) ERR;
+
+    /* Write only the first 2 of 4 elements. */
+    start = 0; count = 2;
+    if (nc_put_vara(ncid, varid, &start, &count, data)) ERR;
+    if (nc_close(ncid)) ERR;
+
+    /* Read back all 4 elements — this is the call that fails with
+     * NC_EHDFERR on buggy HDF5 versions. */
+    if (nc_open(FILE_FILL, NC_NOWRITE, &ncid)) ERR;
+
+    data_read = (nc_vlen_t *)calloc(DATA_LENGTH, sizeof(nc_vlen_t));
+    if (!data_read) ERR;
+
+    stat = nc_get_var(ncid, varid, data_read);
+    if (stat) {
+        printf("\n\t*** nc_get_var returned %d (%s) — bug #2212 present",
+               stat, nc_strerror(stat));
+        free(data_read);
+        if (nc_close(ncid)) ERR;
+        ERR;
+    }
+
+    /* If the read succeeded, verify written elements. */
+    if (data_read[0].len != 2) { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+    if (((double *)data_read[0].p)[0] != 2.0)  { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+    if (((double *)data_read[0].p)[1] != 5.0)  { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+    if (data_read[1].len != 3) { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+    if (((double *)data_read[1].p)[0] != 88.0) { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+
+    /* Verify fill elements (indices 2 and 3) got the custom fill. */
+    if (data_read[2].len != 2) { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+    if (((double *)data_read[2].p)[0] != 0.0)   { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+    if (((double *)data_read[2].p)[1] != 101.0) { nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH); free(data_read); ERR; }
+
+    if (nc_reclaim_data(ncid, typeid, data_read, DATA_LENGTH))
+        { free(data_read); ERR; }
+    free(data_read);
+    if (nc_close(ncid)) ERR;
+
+    return 0;
+}
+
 int
 main(int argc, char **argv)
 {
-    printf("\n*** Testing VLEN with unlimited dimension (issues #2181, #2160).\n");
+    printf("\n*** Testing VLEN with unlimited dimension (issues #2181, #2160, #2212).\n");
 
     printf("*** testing VLEN(int) + unlimited dim, partial write/read...");
     if (test_vlen_int_unlim()) ERR;
@@ -283,6 +360,10 @@ main(int argc, char **argv)
 
     printf("*** testing two VLEN vars on same unlimited dim (issue #2181)...");
     if (test_vlen_two_vars_unlim()) ERR;
+    SUMMARIZE_ERR;
+
+    printf("*** testing VLEN + fixed dim + custom fill + chunking (issue #2212)...");
+    if (test_vlen_fill_chunked()) ERR;
     SUMMARIZE_ERR;
 
     FINAL_RESULTS;
